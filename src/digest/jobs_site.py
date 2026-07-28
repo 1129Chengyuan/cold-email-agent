@@ -90,8 +90,8 @@ _PAGE = """<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Fresh SWE Roles · __COUNT__</title>
-<meta name="description" content="Entry-level software engineer roles at verified H-1B sponsors, refreshed daily.">
+<title>Fresh SWE/DE/Infra Internships · __COUNT__</title>
+<meta name="description" content="Software, data, and infrastructure internships at verified H-1B sponsors, refreshed daily.">
 <meta name="color-scheme" content="dark light">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%236366f1'/%3E%3Cstop offset='1' stop-color='%2338bdf8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='url(%23g)'/%3E%3Ctext x='32' y='45' font-family='Arial,Helvetica,sans-serif' font-size='30' font-weight='800' fill='white' text-anchor='middle'%3EH1%3C/text%3E%3C/svg%3E">
 <script>
@@ -309,8 +309,8 @@ _PAGE = """<!DOCTYPE html>
 <div class="wrap">
 
   <div class="eyebrow">H-1B sponsor job board · updated __DATE__</div>
-  <h1>Fresh SWE roles, <span class="accent">every day</span></h1>
-  <p class="sub">Entry-level &amp; early-career software engineer roles pulled from the
+  <h1>Fresh SWE/DE/Infra internships, <span class="accent">every day</span></h1>
+  <p class="sub">Software, data engineering &amp; infrastructure internships pulled from the
     public boards of verified H-1B sponsors — Greenhouse, Lever, Ashby, SmartRecruiters, Workable &amp; Workday. US-only.</p>
   <div class="stats" id="stats"></div>
 
@@ -340,7 +340,7 @@ _PAGE = """<!DOCTYPE html>
   <div class="toolbar">
     <input type="search" id="q" placeholder="Search title, company, or location…" autocomplete="off">
     <span id="chips" style="display:contents"></span>
-    <label class="tog"><input type="checkbox" id="gradOnly"> New-grad only</label>
+    <label class="tog"><input type="checkbox" id="gradOnly"> Internships only</label>
     <select id="sort">
       <option value="seen">Newest first</option>
       <option value="fit">Best fit</option>
@@ -379,7 +379,7 @@ const grid = el('grid'), q = el('q'), gradOnly = el('gradOnly'),
   el('stats').innerHTML =
     `<span class="stat"><b>${JOBS.length}</b> open roles</span>` +
     (nNew ? `<span class="stat hot"><b>${nNew}</b> new today</span>` : '') +
-    `<span class="stat"><b>${nGrad}</b> explicit new-grad</span>` +
+    `<span class="stat"><b>${nGrad}</b> explicit internship</span>` +
     `<span class="stat"><b>${SOURCES.length}</b> sources</span>`;
 })();
 
@@ -435,7 +435,7 @@ function render() {
       <div class="meta">
         ${fitChip(j)}
         <span class="badge b-src">${esc(j.source)}</span>
-        ${j.new_grad ? '<span class="badge b-grad">New grad</span>' : ''}
+        ${j.new_grad ? '<span class="badge b-grad">Internship</span>' : ''}
         ${j.is_new ? '<span class="badge b-new">New</span>' : ''}
         <span class="seen">${esc(j.first_seen)}</span>
       </div>

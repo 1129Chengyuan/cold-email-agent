@@ -84,7 +84,7 @@ def _job_card(j: dict) -> str:
     grad_badge = (
         '<span style="display:inline-block;background:#e8f0fe;color:#1a56c4;'
         'font-size:10px;font-weight:700;letter-spacing:.03em;padding:2px 7px;'
-        'border-radius:10px;margin-left:6px;vertical-align:middle">NEW GRAD</span>'
+        'border-radius:10px;margin-left:6px;vertical-align:middle">INTERNSHIP</span>'
         if j.get("new_grad") else "")
     seen = j.get("first_seen", j.get("updated_at", ""))
 
@@ -144,7 +144,7 @@ def _cards_grid(jobs: list[dict], per_row: int = 4) -> str:
     if not jobs:
         return ('<tr><td style="padding:28px;text-align:center;color:#80868b;'
                 'border:1px dashed #dadce0;border-radius:12px">'
-                'No explicit new-grad SWE roles today. New postings surge in the fall cycle.'
+                'No explicit SWE/DE/Infra internship roles today. New postings surge in the fall/spring cycles.'
                 '</td></tr>')
     max_w = max(240, 1200 // max(per_row, 1))   # ~300px per card at per_row=4
     cells = "".join(
@@ -218,7 +218,7 @@ def build_html(jobs: list[dict]) -> str:
 
             <!-- Header -->
             <tr><td style="padding:4px 6px 16px 6px">
-              <div class="hdr-title" style="font-size:22px;font-weight:750;color:#202124;letter-spacing:-.01em">Fresh SWE roles</div>
+              <div class="hdr-title" style="font-size:22px;font-weight:750;color:#202124;letter-spacing:-.01em">Fresh SWE/DE/Infra internships</div>
               <div style="font-size:13px;color:#5f6368;margin-top:4px">{today}</div>
               <div style="margin-top:12px">
                 <span style="display:inline-block;background:#eef1f4;color:#3c4043;
@@ -226,8 +226,8 @@ def build_html(jobs: list[dict]) -> str:
                 {new_chip}
               </div>
               <div style="font-size:12px;color:#80868b;margin-top:10px;line-height:1.5">
-                Entry-level &amp; early-career Software Engineer roles (new-grad + standard SWE,
-                excluding senior/staff/II+) from your top H-1B sponsor boards. US-only.
+                Internship roles in Software Engineering, Data Engineering &amp; Infrastructure/Cloud
+                from your top H-1B sponsor boards. US-only.
               </div>
             </td></tr>
 
@@ -261,7 +261,7 @@ def send_digest(to_email: str, jobs: list[dict]) -> None:
     msg["To"] = to_email
     msg["From"] = config.SENDER_EMAIL
     n = len(jobs)
-    msg["Subject"] = f"{n} fresh SWE role{'s' if n != 1 else ''} — {dt.date.today():%b %-d}"
+    msg["Subject"] = f"{n} fresh SWE/DE/Infra intern role{'s' if n != 1 else ''} — {dt.date.today():%b %-d}"
     gmail_sender.send_mime(msg)  # SMTP app-password when set, else Gmail API
 
 

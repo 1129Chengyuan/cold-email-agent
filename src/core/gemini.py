@@ -23,7 +23,7 @@ from src.core import config
 
 # Free-tier quotas are PER MODEL and much smaller than advertised, so we
 # keep a fallback chain: the configured model first, then flash as backup.
-_MODELS = list(dict.fromkeys([config.GEMINI_MODEL, "gemini-2.5-flash"]))
+_MODELS = list(dict.fromkeys([config.GEMINI_MODEL, "gemini-flash-latest"]))
 # Embedding model — free tier. Used by resume_kb for RAG retrieval. We request
 # 768 dimensions (the model defaults to 3072) — plenty for a tiny résumé corpus
 # and a third the storage.
@@ -101,6 +101,11 @@ def generate(prompt: str, *, system: str = "", max_output_tokens: int = 500,
                     time.sleep(25)  # per-minute window; back off and retry once
                     continue
                 break  # persistent RPM trouble — try the next model
+            if r.status_code == 400 and "thinkingConfig" in body["generationConfig"]:
+                # Some newer model aliases reject thinkingBudget=0 outright.
+                # Drop it and retry once rather than losing the whole request.
+                body["generationConfig"].pop("thinkingConfig")
+                continue
             r.raise_for_status()
             return r.json()["candidates"][0]["content"]["parts"][0]["text"]
     raise GeminiUnavailable("gemini quota exhausted on all models")

@@ -41,9 +41,9 @@ _POSITIVE = [
     "android engineer", "web developer", "member of technical staff",
     "applications developer", "programmer",
 ]
-_JUNIOR = ["new grad", "new-grad", "university grad", "early career",
-           "early-career", "entry level", "entry-level", "associate",
-           " i ", " i,", " i("]
+# User seeks INTERNSHIPS (SWE/Data Engineering/Infra), not full-time — a title
+# must explicitly signal an internship/co-op to pass.
+_JUNIOR = ["intern", "internship", "co-op", "coop", "co op"]
 _SENIOR = ["senior", "staff", "principal", " lead", "lead ", "manager",
            "director", " ii", " iii", " iv", " 2", " 3", " 4", "sr.", "sr ",
            " l3", " l4", " l5", " l6", "distinguished", "architect", "head of"]
@@ -55,26 +55,23 @@ _NONSOFTWARE = ["technical support", "support engineer", "sales engineer",
                 "chemical", "biomedical", "optical", "materials",
                 # talent-pool / pipeline postings that aren't real openings
                 "talent community", "talent network", "talent pool",
-                "expression of interest", "general application", "future opportunities",
-                # internships (user seeks full-time; spaced variants avoid "internal")
-                "internship", " intern ", " intern,", " intern -", "co-op", " coop "]
+                "expression of interest", "general application", "future opportunities"]
 
 
 def is_explicit_junior(title: str) -> bool:
-    """True only if the title explicitly signals new-grad / entry-level / SWE I."""
+    """True only if the title explicitly signals an internship/co-op."""
     t = f" {title.lower().strip()} "
-    return any(j in t for j in _JUNIOR) or t.rstrip().endswith(" i")
+    return any(j in t for j in _JUNIOR)
 
 
 def is_junior_swe(title: str) -> bool:
-    """An entry-to-early-career SWE role: a software title that is NOT senior.
-
-    Loosened for ~1 YOE — includes plain 'Software Engineer' (no level word) and
-    explicit new-grad/entry/I roles, while still excluding Senior/Staff/Principal/
-    Lead/Manager and II/III+ levels.
+    """An internship-level SWE/Data/Infra role: a software title that explicitly
+    signals an internship/co-op, is not senior, and is not a non-software discipline.
     """
     t = f" {title.lower().strip()} "
     if not any(p in t for p in _POSITIVE):
+        return False
+    if not is_explicit_junior(t):
         return False
     if any(s in t for s in _SENIOR):
         return False

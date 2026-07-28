@@ -89,12 +89,21 @@ tailored emails referencing the user's resume, get approval, send, and log.
 
 ---
 
-## Defaults & preferences (the user, Ethan Wu)
-- New-grad SWE, needs H1B sponsorship, based in Atlanta GA (eligible for most US-remote roles).
+## Defaults & preferences (the user, Cheng-Yuan Li)
+- Georgia Tech CS student (GPA 4.0/4.0, expected May 2028), seeking Software Engineering /
+  Data Engineering / Infrastructure & Cloud **internships**, needs H-1B sponsorship down the
+  road. Based in Atlanta, GA (eligible for most US-remote roles).
 - Email tone: concise, professional, specific. No buzzwords, no "I hope this finds you well."
 - Prefers **quality over volume** — targeted, verified, tailored. 5–10 contacts per role is plenty.
-- Resume highlights to draw from: UC Berkeley CS; GPC (LangGraph AI agent, Google ADK, FastAPI/
-  Spring Boot, GCP — Cloud Run/BigQuery/GCS, React/TypeScript); full-stack Socket.IO messaging app.
+- Resume highlights to draw from: Georgia Tech CS; SWE/Data/Cloud Infra internship at Gordon
+  Food Service (Python, Terraform, GCP — BigQuery/Cloud Run/Cloud Scheduler/Secret Manager,
+  Apache Airflow/PySpark/dbt); TA for Database Systems & Intro to OOP; SmallDB (C++20 LSM-tree
+  storage engine); NBA Analytics data pipeline (Airflow/PySpark/dbt); Research Intern at A*STAR.
+- **Three tailored resumes exist** — pick the one matching the role's focus when attaching:
+  `assets/resume.pdf` (general/SWE, the default), `assets/resume_de.pdf` (Data Engineering),
+  `assets/resume_infra_cloud.pdf` (Infrastructure/Cloud). There's no CLI flag to pick one —
+  to use a non-default resume for a specific outreach run, temporarily set `RESUME_PATH` in
+  `.env` to its path before running `src.outreach.outreach`, then switch it back afterward.
 
 ## Guardrails
 - **ALWAYS give the user a look at the email before you send. Show the full draft(s) and wait for an explicit "send" — no exceptions.**

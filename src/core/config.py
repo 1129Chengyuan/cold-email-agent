@@ -59,7 +59,7 @@ PROSPEO_API_KEY = _optional("PROSPEO_API_KEY")
 # Strongly recommended, but optional: without it, ranking falls back to the
 # free deterministic keyword scorer and outreach uses a plain template.
 GEMINI_API_KEY = _optional("GEMINI_API_KEY")
-GEMINI_MODEL = _optional("GEMINI_MODEL", "gemini-2.5-flash-lite")
+GEMINI_MODEL = _optional("GEMINI_MODEL", "gemini-flash-lite-latest")
 
 # ── Gmail OAuth ──────────────────────────────────────────────
 GMAIL_CREDENTIALS_PATH = _abspath(_optional("GMAIL_CREDENTIALS_PATH", "assets/gmail_credentials.json"))
