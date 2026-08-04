@@ -19,12 +19,23 @@ import time
 from typing import Optional
 
 import requests
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, retry_if_not_exception_type, stop_after_attempt, wait_exponential
 
 from src.core import config
 
 SEARCH_PERSON = "https://api.prospeo.io/search-person"
 ENRICH_PERSON = "https://api.prospeo.io/enrich-person"
+
+# Statuses that mean "this key is done" (out of credits / bad key / rate
+# limited), not a transient server hiccup — no point retrying the same key.
+_KEY_DEAD_STATUSES = {401, 402, 403, 429}
+
+
+class ProspeoKeyExhausted(RuntimeError):
+    """A Prospeo key returned an out-of-credits / auth / rate-limit status."""
+
+
+_dead_keys: set[str] = set()   # keys exhausted this run
 
 # Job titles we ask Prospeo to search for (recruiter / talent / HR)
 RECRUITER_SEARCH_TITLES = [
@@ -46,20 +57,42 @@ RECRUITER_TITLE_KEYWORDS = [
 ]
 
 
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
-def _post(url: str, payload: dict) -> dict:
-    """POST to Prospeo with retry. Auth via X-KEY header."""
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10),
+       retry=retry_if_not_exception_type(ProspeoKeyExhausted))
+def _post_with_key(url: str, payload: dict, key: str) -> dict:
+    """POST to Prospeo with one key, retrying only on transient errors —
+    an exhausted/bad key fails fast so the caller can try the next one."""
     resp = requests.post(
         url,
         json=payload,
         headers={
             "Content-Type": "application/json",
-            "X-KEY": config.PROSPEO_API_KEY,
+            "X-KEY": key,
         },
         timeout=30,
     )
+    if resp.status_code in _KEY_DEAD_STATUSES:
+        raise ProspeoKeyExhausted(f"prospeo key …{key[-4:]}: HTTP {resp.status_code}")
     resp.raise_for_status()
     return resp.json()
+
+
+def _post(url: str, payload: dict) -> dict:
+    """POST to Prospeo, cycling through PROSPEO_API_KEY (comma-separated —
+    several free-trial keys can be stacked) once a key runs out of credits."""
+    if not config.PROSPEO_API_KEYS:
+        raise RuntimeError("PROSPEO_API_KEY not set")
+    last_err: Exception | None = None
+    for key_i, key in enumerate(config.PROSPEO_API_KEYS):
+        if key in _dead_keys:
+            continue
+        try:
+            return _post_with_key(url, payload, key)
+        except ProspeoKeyExhausted as e:
+            _dead_keys.add(key)
+            print(f"  ⚠ prospeo key #{key_i + 1}/{len(config.PROSPEO_API_KEYS)} exhausted, switching: {e}")
+            last_err = e
+    raise last_err or RuntimeError("all PROSPEO_API_KEY entries exhausted")
 
 
 def _title_is_recruiter(title: str) -> bool:

@@ -29,7 +29,9 @@ _MODELS = list(dict.fromkeys([config.GEMINI_MODEL, "gemini-flash-latest"]))
 # and a third the storage.
 _EMBED_MODEL = "gemini-embedding-001"
 _EMBED_DIMS = 768
-_dead: set[str] = set()          # models whose daily quota is gone (this run)
+# Quotas are per (API key, model) — each free-trial key gets its own daily
+# bucket per model. Tracks which combos are dead for the rest of this run.
+_dead: set[tuple[str, str]] = set()
 _lock = threading.Lock()
 _next_ok = 0.0
 _SPACING = 4.5                    # seconds between calls (RPM limit)
@@ -65,11 +67,13 @@ def generate(prompt: str, *, system: str = "", max_output_tokens: int = 500,
              temperature: float = 0.1) -> str:
     """Return the text of a single Gemini completion.
 
-    Rolls through the model fallback chain on daily-quota 429s and retries
-    once on a per-minute 429. Raises GeminiUnavailable when nothing can serve
-    the request.
+    Rolls through every (API key, model) combo on daily-quota 429s and
+    retries once on a per-minute 429, so several free-trial keys can be
+    stacked in GEMINI_API_KEY (comma-separated) and it'll cycle to the next
+    once one's quota is spent. Raises GeminiUnavailable when nothing can
+    serve the request.
     """
-    if not config.GEMINI_API_KEY:
+    if not config.GEMINI_API_KEYS:
         raise GeminiUnavailable("GEMINI_API_KEY not set")
 
     body = {
@@ -83,32 +87,33 @@ def generate(prompt: str, *, system: str = "", max_output_tokens: int = 500,
     if system:
         body["systemInstruction"] = {"parts": [{"text": system}]}
 
-    for model in _MODELS:
-        if model in _dead:
-            continue
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-        for attempt in (1, 2):
-            _throttle()
-            r = requests.post(url, json=body, timeout=45,
-                              headers={"x-goog-api-key": config.GEMINI_API_KEY,
-                                       "Content-Type": "application/json"})
-            if r.status_code == 429:
-                if _quota_is_daily(r):
-                    _dead.add(model)   # dead for the day — next model
-                    print(f"  ⚠ {model}: daily quota exhausted, switching model")
-                    break
-                if attempt == 1:
-                    time.sleep(25)  # per-minute window; back off and retry once
-                    continue
-                break  # persistent RPM trouble — try the next model
-            if r.status_code == 400 and "thinkingConfig" in body["generationConfig"]:
-                # Some newer model aliases reject thinkingBudget=0 outright.
-                # Drop it and retry once rather than losing the whole request.
-                body["generationConfig"].pop("thinkingConfig")
+    for key_i, key in enumerate(config.GEMINI_API_KEYS):
+        for model in _MODELS:
+            if (key, model) in _dead:
                 continue
-            r.raise_for_status()
-            return r.json()["candidates"][0]["content"]["parts"][0]["text"]
-    raise GeminiUnavailable("gemini quota exhausted on all models")
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+            for attempt in (1, 2):
+                _throttle()
+                r = requests.post(url, json=body, timeout=45,
+                                  headers={"x-goog-api-key": key,
+                                           "Content-Type": "application/json"})
+                if r.status_code == 429:
+                    if _quota_is_daily(r):
+                        _dead.add((key, model))   # dead for the day — next model/key
+                        print(f"  ⚠ gemini key #{key_i + 1}/{model}: daily quota exhausted, switching")
+                        break
+                    if attempt == 1:
+                        time.sleep(25)  # per-minute window; back off and retry once
+                        continue
+                    break  # persistent RPM trouble — try the next model/key
+                if r.status_code == 400 and "thinkingConfig" in body["generationConfig"]:
+                    # Some newer model aliases reject thinkingBudget=0 outright.
+                    # Drop it and retry once rather than losing the whole request.
+                    body["generationConfig"].pop("thinkingConfig")
+                    continue
+                r.raise_for_status()
+                return r.json()["candidates"][0]["content"]["parts"][0]["text"]
+    raise GeminiUnavailable("gemini quota exhausted on all keys/models")
 
 
 def embed(texts: str | list[str], *, task_type: str = "RETRIEVAL_DOCUMENT") -> list[list[float]]:
@@ -123,7 +128,7 @@ def embed(texts: str | list[str], *, task_type: str = "RETRIEVAL_DOCUMENT") -> l
     key is unset or the embedding quota is spent, so callers can fall back to
     keyword-only retrieval rather than crash.
     """
-    if not config.GEMINI_API_KEY:
+    if not config.GEMINI_API_KEYS:
         raise GeminiUnavailable("GEMINI_API_KEY not set")
     if isinstance(texts, str):
         texts = [texts]
@@ -140,12 +145,20 @@ def embed(texts: str | list[str], *, task_type: str = "RETRIEVAL_DOCUMENT") -> l
                 "content": {"parts": [{"text": t}]},
                 "taskType": task_type,
                 "outputDimensionality": _EMBED_DIMS}
-        _throttle()
-        r = requests.post(url, json=body, timeout=45,
-                          headers={"x-goog-api-key": config.GEMINI_API_KEY,
-                                   "Content-Type": "application/json"})
-        if r.status_code == 429:
-            raise GeminiUnavailable("embedding quota exhausted")
-        r.raise_for_status()
-        out.append(r.json()["embedding"]["values"])
+        for key_i, key in enumerate(config.GEMINI_API_KEYS):
+            if (key, _EMBED_MODEL) in _dead:
+                continue
+            _throttle()
+            r = requests.post(url, json=body, timeout=45,
+                              headers={"x-goog-api-key": key,
+                                       "Content-Type": "application/json"})
+            if r.status_code == 429:
+                _dead.add((key, _EMBED_MODEL))
+                print(f"  ⚠ gemini key #{key_i + 1}: embedding quota exhausted, switching")
+                continue
+            r.raise_for_status()
+            out.append(r.json()["embedding"]["values"])
+            break
+        else:
+            raise GeminiUnavailable("embedding quota exhausted on all keys")
     return out

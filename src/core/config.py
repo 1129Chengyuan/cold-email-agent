@@ -48,17 +48,33 @@ def _optional(name: str, default: str = "") -> str:
     return os.getenv(name, default).strip()
 
 
+def _key_list(name: str) -> list[str]:
+    """Parse a comma-separated env var into a list of trimmed, non-empty keys.
+
+    Lets a user on multiple free-trial accounts stack keys (e.g.
+    `GEMINI_API_KEY=key1,key2,key3`) — callers cycle to the next one when the
+    current key's quota/credits run out."""
+    raw = _optional(name)
+    return [k.strip() for k in raw.split(",") if k.strip()]
+
+
 # ── Secrets (from .env) ───────────────────────────────────────
 # Prospeo (verified recruiter-email lookup) — OPTIONAL. Without it, outreach
 # falls back to showing no verified contacts; recruiter emails can still be
 # pattern-guessed manually. Only the outreach half ever uses it.
-PROSPEO_API_KEY = _optional("PROSPEO_API_KEY")
+# Comma-separate multiple keys (e.g. several free-trial accounts) to cycle to
+# the next one once a key runs out of credits.
+PROSPEO_API_KEYS = _key_list("PROSPEO_API_KEY")
+PROSPEO_API_KEY = PROSPEO_API_KEYS[0] if PROSPEO_API_KEYS else ""
 
 # Google Gemini key (aistudio.google.com) — the project's only LLM, on the
 # FREE tier. Powers both the daily fit-ranking and the cold-email writer.
 # Strongly recommended, but optional: without it, ranking falls back to the
 # free deterministic keyword scorer and outreach uses a plain template.
-GEMINI_API_KEY = _optional("GEMINI_API_KEY")
+# Comma-separate multiple keys to cycle to the next once one's daily free-tier
+# quota is exhausted.
+GEMINI_API_KEYS = _key_list("GEMINI_API_KEY")
+GEMINI_API_KEY = GEMINI_API_KEYS[0] if GEMINI_API_KEYS else ""
 GEMINI_MODEL = _optional("GEMINI_MODEL", "gemini-flash-lite-latest")
 
 # ── Gmail OAuth ──────────────────────────────────────────────
