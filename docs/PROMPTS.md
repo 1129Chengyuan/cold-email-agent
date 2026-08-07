@@ -18,16 +18,11 @@ JD:
 <PASTE FULL JOB DESCRIPTION HERE>
 
 Automatically find 10 US-based recruiters/early-career/campus recruiters AND 2
-hiring managers highly correlated to this specific role/team (verify the team on
-LinkedIn first) — don't wait to be asked. Always ask me before sending.
-FIRST find the company's email pattern ONLINE
-(web search / known formats) and use that to construct the addresses. Only if I
-tell you the pattern is wrong (bounces), spend ONE Prospeo reveal to determine
-the correct pattern, then reconstruct the rest from it. Draft a ~100–120 word
-tailored email per person, lead with UC Berkeley CS + Genuine Parts Company
-(Fortune 200), tie my resume to this JD, sign with both emails (gmail +
-berkeley), no GitHub. SHOW me every draft and WAIT — do not send until I say
-"send".
+hiring managers or engineers highly correlated to this specific role/team — don't wait to be asked. Always ask me before sending.
+
+FIRST find the company's email pattern ONLINE (web search / known formats) and use that to construct the addresses. Only if I tell you the pattern is wrong (bounces), spend ONE Prospeo reveal to determine the correct pattern, then reconstruct the rest from it. 
+
+Draft a ~100–120 word tailored email per person using the _SYSTEM_PROMPT rules: lead with Georgia Tech CS + Gordon Food Service, tie my resume to this JD, and sign with my standard signature block. SHOW me every draft and candidate list, then WAIT — do not send until I explicitly say "send".
 ```
 
 ---

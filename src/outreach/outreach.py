@@ -28,6 +28,9 @@ from pathlib import Path
 from src.core import config
 from src.outreach.prospeo_lookup import _search_recruiters, _reveal_email
 from src.outreach.email_generator import generate_outreach
+from src.outreach.cover_letter_generator import generate_cover_letter
+from src.outreach.resume_selector import select_resume
+from src.outreach.resume_builder import build_resume
 from src.core.gmail_sender import send_email
 from src.outreach.sheets_logger import already_emailed, log_outreach
 
@@ -71,7 +74,7 @@ def find_verified_recruiters(company_domain: str, max_people: int,
 
 
 def run(company_domain: str, title: str, jd_text: str, max_people: int,
-        send: bool, allow_unverified: bool) -> None:
+        send: bool, allow_unverified: bool, hook: str | None = None) -> None:
     recruiters = find_verified_recruiters(company_domain, max_people, allow_unverified)
     if not recruiters:
         print("\nNothing to send. Try a different domain or --allow-unverified.")
@@ -87,6 +90,17 @@ def run(company_domain: str, title: str, jd_text: str, max_people: int,
         "date_posted": "",
         "h1b_signal": 1,
     }
+
+    resume_path = build_resume(job) or select_resume(job)
+    config.RESUME_PATH = resume_path
+    print(f"  📄 Résumé for review → {resume_path}")
+
+    try:
+        cover_letter_path = generate_cover_letter(job)
+        if cover_letter_path:
+            config.COVER_LETTER_PATH = cover_letter_path
+    except Exception as e:
+        print(f"  ⚠ Cover letter generation failed: {e} — sending without one")
 
     print(f"\n▶ {'SENDING' if send else 'PREVIEW (no send)'} — {len(recruiters)} recruiter(s)\n")
     sent = skipped = failed = 0
@@ -104,7 +118,7 @@ def run(company_domain: str, title: str, jd_text: str, max_people: int,
             "email": r["email"],
         }
         try:
-            out = generate_outreach(job, recruiter)
+            out = generate_outreach(job, recruiter, hook=hook)
         except Exception as e:
             print(f"  ❌ Generation failed for {r['name']}: {e}")
             failed += 1
@@ -149,6 +163,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--send", action="store_true", help="Actually send (default: preview)")
     p.add_argument("--allow-unverified", action="store_true",
                    help="Include contacts without a Prospeo-verified email (bounce risk)")
+    p.add_argument("--hook", help="A real, specific, current fact about the company/team "
+                                   "(from web research) to open the email with")
     return p.parse_args()
 
 
@@ -163,7 +179,7 @@ if __name__ == "__main__":
         jd_text = jd_path.read_text()
 
     try:
-        run(args.company, args.title, jd_text, args.max, args.send, args.allow_unverified)
+        run(args.company, args.title, jd_text, args.max, args.send, args.allow_unverified, args.hook)
     except KeyboardInterrupt:
         print("\nInterrupted.")
         sys.exit(0)

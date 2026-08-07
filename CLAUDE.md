@@ -78,6 +78,10 @@ mechanical engineer"), their **résumé**, and the **email address** for the dig
 
 - **Never send outreach without showing the drafts and getting an explicit "send."**
   The daily digest goes only to the user's own inbox; cold emails go to real recruiters.
+- **Send flow:** one Prospeo reveal per company to confirm the email pattern, then
+  construct the rest from that pattern and send the batch immediately — no reveal per
+  person, no automatic bounce-checking. `bounce_retry.py`'s IMAP bounce check is a manual,
+  opt-in tool (`--check`/`--retry`) the user runs on request, never automatic.
 - **Never weaken the H-1B-sponsor filter** (see the rule above).
 - **Never commit secrets.** `.env`, `assets/*.json`, and `assets/resume.pdf` are gitignored;
   in CI they come from GitHub Secrets. `data/h1b_employers.db` IS committed on purpose

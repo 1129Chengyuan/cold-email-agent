@@ -59,18 +59,32 @@ def _conn() -> sqlite3.Connection:
 # ── Email-name patterns, most-common first ───────────────────
 def candidate_emails(first: str, last: str, domain: str) -> list[str]:
     """Ordered candidate addresses for a person. Last name is stripped of
-    spaces/hyphens (e.g. 'Shepard Franklin' -> 'shepardfranklin')."""
+    spaces/hyphens (e.g. 'Shepard Franklin' -> 'shepardfranklin').
+
+    If we've already confirmed a pattern for this domain from a past send
+    (see dominant_pattern_for_domain), it's tried first."""
     f = re.sub(r"[^a-z]", "", (first or "").lower())
     l = re.sub(r"[^a-z]", "", (last or "").lower())
     if not f or not domain:
         return []
     fi, li = f[:1], l[:1]
-    # order = most common patterns first, so the 3 retries cover first.last,
+    shapes = {
+        "first.last": f"{f}.{l}", "flast": f"{fi}{l}", "first": f,
+        "first_last": f"{f}_{l}", "firstlast": f"{f}{l}",
+        "f.last": f"{fi}.{l}", "first.l": f"{f}.{li}", "firstl": f"{f}{li}",
+    }
+    # order = most common patterns first, so the retries cover first.last,
     # flast, first@, and first_last (the four dominant company formats)
-    raw = [f"{f}.{l}", f"{fi}{l}", f, f"{f}_{l}", f"{f}{l}", f"{fi}.{l}", f"{f}.{li}"] if l \
-        else [f]
+    order = ["first.last", "flast", "first", "first_last", "firstlast", "f.last",
+             "first.l", "firstl"] if l else ["first"]
+
+    known = dominant_pattern_for_domain(domain) if l else None
+    if known and known in order:
+        order = [known] + [k for k in order if k != known]
+
     out, seen = [], set()
-    for p in raw:
+    for key in order:
+        p = shapes[key]
         if not p or p.endswith(".") or p.startswith("."):
             continue
         e = f"{p}@{domain}"
@@ -78,6 +92,51 @@ def candidate_emails(first: str, last: str, domain: str) -> list[str]:
             seen.add(e)
             out.append(e)
     return out
+
+
+# ── Reuse patterns already confirmed for a domain ─────────────
+def _classify(local_part: str, f: str, l: str) -> str | None:
+    """Which pattern shape does this local-part (e.g. 'jane.doe') match?"""
+    fi, li = f[:1], l[:1]
+    shapes = {
+        f"{f}.{l}": "first.last", f"{fi}{l}": "flast", f: "first",
+        f"{f}_{l}": "first_last", f"{f}{l}": "firstlast",
+        f"{fi}.{l}": "f.last", f"{f}.{li}": "first.l", f"{f}{li}": "firstl",
+    }
+    return shapes.get(local_part)
+
+
+def dominant_pattern_for_domain(domain: str) -> str | None:
+    """Look at addresses we've actually sent to at this domain before
+    (data/outreach_state.db) and return the most common pattern shape,
+    preferring Prospeo-verified sends over unconfirmed guesses. Returns
+    None if we have no history for this domain. Pure lookup — spends no
+    API credits and does no network I/O."""
+    c = _conn()
+    rows = c.execute("SELECT first, last, current_email, status FROM outreach_sends "
+                     "WHERE domain=?", (domain,)).fetchall()
+    c.close()
+    if not rows:
+        return None
+
+    from collections import Counter
+    verified, all_seen = Counter(), Counter()
+    for r in rows:
+        f = re.sub(r"[^a-z]", "", (r["first"] or "").lower())
+        l = re.sub(r"[^a-z]", "", (r["last"] or "").lower())
+        local = (r["current_email"] or "").split("@")[0].lower()
+        key = _classify(local, f, l)
+        if not key:
+            continue
+        all_seen[key] += 1
+        if r["status"] in ("retried_verified", "retried"):
+            verified[key] += 1
+
+    if verified:
+        return verified.most_common(1)[0][0]
+    if all_seen:
+        return all_seen.most_common(1)[0][0]
+    return None
 
 
 # ── Record a send (call this from the outreach flow) ─────────

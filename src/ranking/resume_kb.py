@@ -92,8 +92,32 @@ def _load_corpus() -> list[dict]:
         cid = c.get("id") or hashlib.sha1(text.encode()).hexdigest()[:12]
         tags = [t.strip().lower() for t in c.get("tags", []) if t.strip()]
         out.append({"id": cid, "text": text,
-                    "source": (c.get("source") or "").strip(), "tags": tags})
+                    "source": (c.get("source") or "").strip(), "tags": tags,
+                    "priority": c.get("priority"), "link": (c.get("link") or "").strip() or None,
+                    "xyz_text": (c.get("xyz_text") or "").strip() or None})
     return out
+
+
+def all_bullets() -> dict[str, str]:
+    """Every corpus bullet's plain-prose text, keyed by id (used for email/
+    cover-letter grounding)."""
+    return {c["id"]: c["text"] for c in _load_corpus()}
+
+
+def all_resume_bullets() -> dict[str, str]:
+    """Every corpus bullet's résumé text, keyed by id — the strict Google
+    XYZ-format version ("xyz_text") where curated, falling back to the
+    plain-prose "text" otherwise. Used only for ATS résumé generation, never
+    for the cold email/cover letter (those stay on the approved plain style)."""
+    return {c["id"]: (c.get("xyz_text") or c["text"]) for c in _load_corpus()}
+
+
+def get_link(bullet_id: str) -> str | None:
+    """The proof link (e.g. GitHub repo) curated for a bullet, if any."""
+    for c in _load_corpus():
+        if c["id"] == bullet_id:
+            return c.get("link")
+    return None
 
 
 # ── Build / refresh the index ────────────────────────────────
@@ -162,14 +186,10 @@ def _tag_overlap(tags: list[str], text_low: str) -> float:
     return sum(1 for t in tags if t and t in text_low) / len(tags)
 
 
-def retrieve(jd_text: str, title: str = "", k: int = 5,
-             db_path: str | None = None) -> list[dict]:
-    """Return the top-k most relevant résumé bullets for a job.
-
-    Hybrid: 0.75 * semantic cosine + 0.25 * tag overlap. Degrades to tag-only
-    ranking when the embedding API is unavailable. Returns
-    [{id, text, source, score}] best-first; [] if nothing is relevant.
-    """
+def _score_all(jd_text: str, title: str = "",
+                db_path: str | None = None) -> list[tuple[float, "sqlite3.Row"]]:
+    """Score every corpus bullet against a job, best-first. No filtering or
+    priority pinning applied — shared by retrieve() and score_all()."""
     conn = _conn(db_path)
     rows = conn.execute(
         "SELECT id, text, source, tags, embedding FROM resume_chunks").fetchall()
@@ -207,12 +227,63 @@ def retrieve(jd_text: str, title: str = "", k: int = 5,
         scored.append((score, r))
 
     scored.sort(key=lambda x: x[0], reverse=True)
+    return scored
+
+
+def score_all(jd_text: str, title: str = "", db_path: str | None = None) -> dict[str, float]:
+    """Raw relevance score for every bullet in the corpus, keyed by id — no
+    threshold filtering or priority pinning. Used by resume_builder to rank
+    bullets WITHIN a fixed subset (e.g. "this job's 3 bullets" or "this
+    project's bullets") where every item must appear regardless of score,
+    just reordered by relevance."""
+    return {r["id"]: score for score, r in _score_all(jd_text, title, db_path)}
+
+
+def retrieve(jd_text: str, title: str = "", k: int = 5,
+             db_path: str | None = None) -> list[dict]:
+    """Return the top-k most relevant résumé bullets for a job.
+
+    Hybrid: 0.75 * semantic cosine + 0.25 * tag overlap. Degrades to tag-only
+    ranking when the embedding API is unavailable. Returns
+    [{id, text, source, score}] best-first; [] if nothing is relevant.
+
+    Priority pinning: bullets tagged "priority": 1 in experience.json (the
+    single flagship achievement) are surfaced first, and "priority": 2 (a
+    strong secondary highlight) next — UNLESS a non-pinned bullet's role
+    score beats the priority-1 bullet's own role score by more than
+    OVERRIDE_MARGIN, in which case that clearly-more-relevant bullet takes
+    the lead slot instead (priority-1 drops to right after it, still
+    guaranteed inclusion). This keeps the flagship fact front-and-center by
+    default, while letting a role that's a much stronger match for something
+    else (e.g. a research role vs. the cost-optimization result) win the lead.
+    Remaining slots fill with normal role-relevance ranking.
+    """
+    OVERRIDE_MARGIN = 0.05
+    scored = _score_all(jd_text, title, db_path)
+    if not scored:
+        return []
+
+    corpus = _load_corpus()
+    priority_map = {c["id"]: c.get("priority") for c in corpus}
+    link_map = {c["id"]: c.get("link") for c in corpus}
+    tier1 = [(s, r) for s, r in scored if priority_map.get(r["id"]) == 1]
+    tier2 = [(s, r) for s, r in scored if priority_map.get(r["id"]) == 2]
+    rest = [(s, r) for s, r in scored if priority_map.get(r["id"]) not in (1, 2)]
+
+    if tier1 and rest and rest[0][0] > tier1[0][0] + OVERRIDE_MARGIN:
+        ordered = [rest[0]] + tier1 + tier2 + rest[1:]
+    else:
+        ordered = tier1 + tier2 + rest  # each sublist already best-first (from `scored`)
+
     out = []
-    for score, r in scored[:k]:
-        if score <= 0:
+    for score, r in ordered:
+        if len(out) >= k:
+            break
+        pinned = priority_map.get(r["id"]) in (1, 2)
+        if not pinned and score <= 0:
             continue
-        out.append({"id": r["id"], "text": r["text"],
-                    "source": r["source"], "score": round(float(score), 4)})
+        out.append({"id": r["id"], "text": r["text"], "source": r["source"],
+                    "score": round(float(score), 4), "link": link_map.get(r["id"])})
     return out
 
 

@@ -102,6 +102,13 @@ CLICK_TRACKER_URL = _optional("CLICK_TRACKER_URL", "")
 RESUME_PATH = _abspath(_optional("RESUME_PATH", "assets/resume.pdf"))
 COVER_LETTER_PATH = _abspath(_optional("COVER_LETTER_PATH", "assets/cover_letter.pdf"))
 
+# Folder where auto-generated, job-specific résumés/cover letters land for
+# the user to review BEFORE they get attached to an outreach email — never
+# send straight from a fresh generation without this checkpoint.
+AUTOGEN_OUTPUT_DIR = os.path.expanduser(
+    _optional("AUTOGEN_OUTPUT_DIR", "~/Documents/AutoGenResumes"))
+
+
 # ── Job Search Settings ──────────────────────────────────────
 JOB_MAX_AGE_HOURS = int(_optional("JOB_MAX_AGE_HOURS", "24"))
 MAX_JOBS_PER_RUN = int(_optional("MAX_JOBS_PER_RUN", "10"))
@@ -127,6 +134,7 @@ YOUR_NAME = _optional("YOUR_NAME", "Your Name")
 YOUR_PHONE = _optional("YOUR_PHONE", "")
 YOUR_LINKEDIN = _optional("YOUR_LINKEDIN", "")
 YOUR_GITHUB = _optional("YOUR_GITHUB", "")
+YOUR_PORTFOLIO = _optional("YOUR_PORTFOLIO", "")
 YOUR_EMAIL_PRIMARY = _optional("YOUR_EMAIL_PRIMARY", SENDER_EMAIL)
 YOUR_EMAIL_ALT = _optional("YOUR_EMAIL_ALT", "")
 YOUR_BIO = _optional(
